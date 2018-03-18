@@ -5,11 +5,17 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"github.com/urfave/cli"
 
 	"github.com/alerting/go-cap"
 	"github.com/alerting/go-cap-process/tasks"
+)
+
+// We should be receiving 1 alert per minute minimum
+var (
+	timeout = 80 * time.Second
 )
 
 func connect(c *cli.Context) error {
@@ -34,6 +40,8 @@ func connect(c *cli.Context) error {
 	decoder := xml.NewDecoder(conn)
 
 	for {
+		conn.SetReadDeadline(time.Now().Add(timeout))
+
 		var alert cap.Alert
 
 		if err = decoder.Decode(&alert); err != nil {
@@ -63,7 +71,7 @@ func main() {
 	}
 	app.Copyright = "Copyright (c) 2018 Zachary Seguin"
 
-	app.Flags = tasks.Flags
+	app.Flags = tasks.ServerFlags
 
 	app.Commands = []cli.Command{
 		{

@@ -21,7 +21,10 @@ func main() {
 	}
 	app.Copyright = "Copyright (c) 2018 Zachary Seguin"
 
-	app.Flags = tasks.Flags
+	app.Flags = make([]cli.Flag, 0)
+	app.Flags = append(app.Flags, tasks.ServerFlags...)
+	app.Flags = append(app.Flags, tasks.SystemFlags...)
+	app.Flags = append(app.Flags, tasks.DatabaseFlags...)
 
 	app.Commands = []cli.Command{
 		{
@@ -32,12 +35,18 @@ func main() {
 			Flags: []cli.Flag{
 				cli.IntFlag{
 					Name:   "tag",
-					Usage:  "Worker tag (ideally each worker should be unique",
+					Usage:  "Worker tag (ideally each worker should be unique)",
 					EnvVar: "CAP_TAG",
 					Value:  0,
 				},
 			},
 			Action: work,
+		},
+		{
+			Name:      "setup",
+			Usage:     "Setup the database",
+			ArgsUsage: "",
+			Action:    setup,
 		},
 	}
 

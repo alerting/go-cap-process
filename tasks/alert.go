@@ -28,6 +28,7 @@ func AddAlert(server *machinery.Server, alert *cap.Alert) (*backends.AsyncResult
 				Value: b.String(),
 			},
 		},
+		RetryCount: 20,
 	}
 
 	return server.SendTask(&task)

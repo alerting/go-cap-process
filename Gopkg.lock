@@ -96,6 +96,27 @@
   revision = "b2c5c876e2659d9060d82e9b8494150d53854cc4"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/mailru/easyjson"
+  packages = [
+    ".",
+    "buffer",
+    "jlexer",
+    "jwriter"
+  ]
+  revision = "f594efddfa171111dc4349cd6e78e8f61dc7936f"
+
+[[projects]]
+  name = "github.com/olivere/elastic"
+  packages = [
+    ".",
+    "config",
+    "uritemplates"
+  ]
+  revision = "f9243358b15391d76b5d0e2cb816442f9cded8cc"
+  version = "v6.1.12"
+
+[[projects]]
   name = "github.com/opentracing/opentracing-go"
   packages = [
     ".",
@@ -104,6 +125,12 @@
   ]
   revision = "1949ddbfd147afd4d964a9f00b24eb291e0e7c38"
   version = "v1.0.2"
+
+[[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -156,6 +183,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0040b4f12b10f90d4f059b1a2c8ff78859182a8a5ff414b4319123302792685f"
+  inputs-digest = "9a3f9e123ef645aa2f15fe248e0e2a3cf942efe2153a0a8545f63a2f569f0f84"
   solver-name = "gps-cdcl"
   solver-version = 1

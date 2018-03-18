@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	Flags = []cli.Flag{
+	ServerFlags = []cli.Flag{
 		cli.StringFlag{
 			Name:   "broker, b",
 			Usage:  "Message broker URL",
@@ -36,23 +36,19 @@ var (
 )
 
 func getStringValue(c *cli.Context, arg string) string {
-	if c.IsSet(arg) {
+	if c.String(arg) != "" {
 		return c.String(arg)
-	} else if c.GlobalIsSet(arg) {
-		return c.GlobalString(arg)
 	}
 
-	return ""
+	return c.GlobalString(arg)
 }
 
 func getIntValue(c *cli.Context, arg string) int {
 	if c.IsSet(arg) {
 		return c.Int(arg)
-	} else if c.GlobalIsSet(arg) {
-		return c.GlobalInt(arg)
 	}
 
-	return 0
+	return c.GlobalInt(arg)
 }
 
 func CreateServer(c *cli.Context) (*machinery.Server, error) {
