@@ -33,3 +33,15 @@ func AddAlert(server *machinery.Server, alert *cap.Alert) (*backends.AsyncResult
 
 	return server.SendTask(&task)
 }
+
+func ProcessAlert(alert *cap.Alert) error {
+	for indx, info := range alert.Infos {
+		// If the info contains no effective time,
+		// the specification says to use the sent time.
+		if info.Effective == nil {
+			alert.Infos[indx].Effective = &alert.Sent
+		}
+	}
+
+	return nil
+}

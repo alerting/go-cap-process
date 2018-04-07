@@ -2,11 +2,14 @@ package elastic
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/olivere/elastic"
 
 	"github.com/alerting/go-cap"
+	"github.com/alerting/go-cap-process/db"
 )
 
 type Elastic struct {
@@ -44,14 +47,65 @@ func (es *Elastic) Setup() error {
 	return nil
 }
 
-func (es *Elastic) AddAlert(alert *cap.Alert) error {
-	_, err := es.client.Index().
-		Index(es.index).Type("alert").Id(alert.Id()).
-		BodyJson(alert).
-		Refresh("wait_for").
-		Do(context.Background())
+func (es *Elastic) AddAlert(alerts ...*cap.Alert) error {
+	bulkAlert := es.client.Bulk().Index(es.index).Type("_doc")
+	bulkInfo := es.client.Bulk().Index(es.index).Type("_doc")
 
-	return err
+	for _, alert := range alerts {
+		// Convert to map[string]interface{}
+		var alertMap map[string]interface{}
+		b, _ := json.Marshal(&alert)
+		json.Unmarshal(b, &alertMap)
+
+		// We don't need the infos item (will be added independently)
+		delete(alertMap, "infos")
+
+		// Setup Parent
+		alertMap["_object"] = map[string]string{
+			"name": "alert",
+		}
+
+		bulkAlert.Add(elastic.NewBulkIndexRequest().Id(alert.Id()).Doc(alertMap))
+
+		for indx, info := range alert.Infos {
+			var infoMap map[string]interface{}
+			b, _ := json.Marshal(&info)
+			json.Unmarshal(b, &infoMap)
+
+			// Setup Parent
+			infoMap["_object"] = map[string]string{
+				"name":   "info",
+				"parent": alert.Id(),
+			}
+
+			bulkInfo.Add(
+				elastic.NewBulkIndexRequest().
+					Id(fmt.Sprintf("%s:%d", alert.Id(), indx)).
+					Routing(alert.Id()).
+					Doc(infoMap))
+		}
+	}
+
+	// TODO: Process errors
+	_, err := bulkAlert.Do(context.Background())
+	if err != nil {
+		return err
+	}
+
+	res, err := bulkInfo.Do(context.Background())
+	if err != nil {
+		return err
+	}
+	if res.Errors {
+		for _, i := range res.Items {
+			if i["index"].Error != nil {
+				fmt.Println(i["index"].Id)
+				fmt.Println(i["index"].Error)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (es *Elastic) AlertExists(reference *cap.Reference) (bool, error) {
@@ -66,4 +120,8 @@ func (es *Elastic) AlertExists(reference *cap.Reference) (bool, error) {
 
 func (es *Elastic) GetAlert(reference *cap.Reference) (*cap.Alert, error) {
 	return nil, errors.New("Not implemented")
+}
+
+func (es *Elastic) NewInfoFinder() db.InfoFinder {
+	return NewInfoFinder(es)
 }
