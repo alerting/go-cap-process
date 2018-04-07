@@ -3,6 +3,7 @@ package db
 import cap "github.com/alerting/go-cap"
 
 type InfoHit struct {
+	Id      string    `json:"id"`
 	AlertId string    `json:"alert_id"`
 	Info    *cap.Info `json:"info"`
 }

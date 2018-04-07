@@ -111,6 +111,7 @@ func (f *InfoFinder) Find() (*db.InfoResults, error) {
 		}
 
 		infoHit := db.InfoHit{
+			Id:      hit.Id,
 			AlertId: hit.Routing,
 			Info:    &info,
 		}
@@ -122,13 +123,10 @@ func (f *InfoFinder) Find() (*db.InfoResults, error) {
 }
 
 func (f *InfoFinder) query(service *elastic.SearchService) *elastic.SearchService {
-	// If there is no query, just return a MatchAll query.
-	if len(f.termFields) == 0 {
-		service = service.Query(elastic.NewMatchAllQuery())
-		return service
-	}
-
 	q := elastic.NewBoolQuery()
+
+	// Parent filter
+	q = q.Must(elastic.NewHasParentQuery("alert", elastic.NewMatchAllQuery()))
 
 	// Filter on termFields
 	if len(f.termFields) > 0 {
