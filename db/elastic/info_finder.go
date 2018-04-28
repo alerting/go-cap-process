@@ -13,8 +13,11 @@ import (
 type InfoFinder struct {
 	elastic *Elastic
 
-	termFields map[string]string
-	textFields map[string]string
+	parentFields map[string]string
+	termFields   map[string]string
+	textFields   map[string]string
+	area         string
+	point        *elastic.GeoPoint
 
 	start int
 	count int
@@ -24,16 +27,32 @@ type InfoFinder struct {
 
 func NewInfoFinder(elastic *Elastic) db.InfoFinder {
 	return &InfoFinder{
-		elastic:    elastic,
-		termFields: make(map[string]string),
-		textFields: make(map[string]string),
-		start:      -1,
-		count:      -1,
-		sort:       make([]string, 0),
+		elastic:      elastic,
+		parentFields: make(map[string]string),
+		termFields:   make(map[string]string),
+		textFields:   make(map[string]string),
+		start:        -1,
+		count:        -1,
+		sort:         make([]string, 0),
 	}
 }
 
 /** FILTERS **/
+func (f *InfoFinder) Status(status cap.Status) db.InfoFinder {
+	f.parentFields["status"] = status.String()
+	return f
+}
+
+func (f *InfoFinder) MessageType(messageType cap.MessageType) db.InfoFinder {
+	f.parentFields["message_type"] = messageType.String()
+	return f
+}
+
+func (f *InfoFinder) Scope(scope cap.Scope) db.InfoFinder {
+	f.parentFields["scope"] = scope.String()
+	return f
+}
+
 func (f *InfoFinder) Language(language string) db.InfoFinder {
 	f.termFields["language"] = language
 	return f
@@ -66,6 +85,16 @@ func (f *InfoFinder) Description(description string) db.InfoFinder {
 
 func (f *InfoFinder) Instruction(instruction string) db.InfoFinder {
 	f.textFields["instruction"] = instruction
+	return f
+}
+
+func (f *InfoFinder) Area(area string) db.InfoFinder {
+	f.area = area
+	return f
+}
+
+func (f *InfoFinder) Point(lat, lon float64) db.InfoFinder {
+	f.point = elastic.GeoPointFromLatLon(lat, lon)
 	return f
 }
 
@@ -126,7 +155,17 @@ func (f *InfoFinder) query(service *elastic.SearchService) *elastic.SearchServic
 	q := elastic.NewBoolQuery()
 
 	// Parent filter
-	q = q.Must(elastic.NewHasParentQuery("alert", elastic.NewMatchAllQuery()))
+	if len(f.parentFields) > 0 {
+		pq := elastic.NewBoolQuery()
+
+		for k, v := range f.parentFields {
+			pq = pq.Must(elastic.NewTermQuery(k, v))
+		}
+
+		q = q.Must(elastic.NewHasParentQuery("alert", pq))
+	} else {
+		q = q.Must(elastic.NewHasParentQuery("alert", elastic.NewMatchAllQuery()))
+	}
 
 	// Filter on termFields
 	if len(f.termFields) > 0 {
@@ -140,6 +179,28 @@ func (f *InfoFinder) query(service *elastic.SearchService) *elastic.SearchServic
 		for k, v := range f.textFields {
 			q = q.Must(elastic.NewQueryStringQuery(v).Field(k))
 		}
+	}
+
+	// Filter on area
+	if f.area != "" || f.point != nil {
+		aq := elastic.NewBoolQuery()
+
+		if f.area != "" {
+			aq = aq.Must(elastic.NewQueryStringQuery(f.area).Field("areas.description"))
+		}
+
+		if f.point != nil {
+			pq := elastic.NewBoolQuery()
+			pq = pq.Should(NewGeoShapeQuery("areas.polygons").SetPoint(f.point.Lat, f.point.Lon))
+			pq = pq.Should(NewGeoShapeQuery("areas.circles").SetPoint(f.point.Lat, f.point.Lon))
+
+			aq = aq.Must(pq)
+		}
+
+		nq := elastic.NewNestedQuery("areas", aq)
+		nq.InnerHit(elastic.NewInnerHit().FetchSourceContext(elastic.NewFetchSourceContext(false)))
+
+		q = q.Must(nq)
 	}
 
 	service = service.Query(q)

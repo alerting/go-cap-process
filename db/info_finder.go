@@ -15,6 +15,10 @@ type InfoResults struct {
 
 type InfoFinder interface {
 	// Filter
+	Status(status cap.Status) InfoFinder
+	MessageType(messageType cap.MessageType) InfoFinder
+	Scope(scope cap.Scope) InfoFinder
+
 	Language(language string) InfoFinder
 	Certainty(certainty cap.Certainty) InfoFinder
 	Severity(severity cap.Severity) InfoFinder
@@ -22,6 +26,9 @@ type InfoFinder interface {
 	Headline(headline string) InfoFinder
 	Description(description string) InfoFinder
 	Instruction(instruction string) InfoFinder
+
+	Area(area string) InfoFinder
+	Point(lat, lon float64) InfoFinder
 
 	// Pagination
 	Start(start int) InfoFinder

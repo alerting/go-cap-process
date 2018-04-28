@@ -109,7 +109,7 @@ func (es *Elastic) AddAlert(alerts ...*cap.Alert) error {
 }
 
 func (es *Elastic) AlertExists(reference *cap.Reference) (bool, error) {
-	item := elastic.NewMultiGetItem().Index(es.index).Type("alert").Id(reference.Id())
+	item := elastic.NewMultiGetItem().Index(es.index).Type("_doc").Id(reference.Id())
 	res, err := es.client.MultiGet().Add(item).Do(context.Background())
 	if err != nil {
 		return false, err
