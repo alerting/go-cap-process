@@ -7,7 +7,7 @@ import (
 	"github.com/alerting/go-cap-process/db"
 	"github.com/olivere/elastic"
 	"strings"
-	//"log"
+	"time"
 )
 
 type InfoFinder struct {
@@ -16,6 +16,9 @@ type InfoFinder struct {
 	parentFields map[string]string
 	termFields   map[string]string
 	textFields   map[string]string
+	effective    map[string]time.Time
+	expires      map[string]time.Time
+	onset        map[string]time.Time
 	area         string
 	point        *elastic.GeoPoint
 
@@ -31,6 +34,9 @@ func NewInfoFinder(elastic *Elastic) db.InfoFinder {
 		parentFields: make(map[string]string),
 		termFields:   make(map[string]string),
 		textFields:   make(map[string]string),
+		effective:    make(map[string]time.Time),
+		expires:      make(map[string]time.Time),
+		onset:        make(map[string]time.Time),
 		start:        -1,
 		count:        -1,
 		sort:         make([]string, 0),
@@ -85,6 +91,66 @@ func (f *InfoFinder) Description(description string) db.InfoFinder {
 
 func (f *InfoFinder) Instruction(instruction string) db.InfoFinder {
 	f.textFields["instruction"] = instruction
+	return f
+}
+
+func (f *InfoFinder) EffectiveGte(t time.Time) db.InfoFinder {
+	f.effective["gte"] = t
+	return f
+}
+
+func (f *InfoFinder) EffectiveGt(t time.Time) db.InfoFinder {
+	f.effective["gt"] = t
+	return f
+}
+
+func (f *InfoFinder) EffectiveLte(t time.Time) db.InfoFinder {
+	f.effective["lte"] = t
+	return f
+}
+
+func (f *InfoFinder) EffectiveLt(t time.Time) db.InfoFinder {
+	f.effective["lt"] = t
+	return f
+}
+
+func (f *InfoFinder) ExpiresGte(t time.Time) db.InfoFinder {
+	f.expires["gte"] = t
+	return f
+}
+
+func (f *InfoFinder) ExpiresGt(t time.Time) db.InfoFinder {
+	f.expires["gt"] = t
+	return f
+}
+
+func (f *InfoFinder) ExpiresLte(t time.Time) db.InfoFinder {
+	f.expires["lte"] = t
+	return f
+}
+
+func (f *InfoFinder) ExpiresLt(t time.Time) db.InfoFinder {
+	f.expires["lt"] = t
+	return f
+}
+
+func (f *InfoFinder) OnsetGte(t time.Time) db.InfoFinder {
+	f.onset["gte"] = t
+	return f
+}
+
+func (f *InfoFinder) OnsetGt(t time.Time) db.InfoFinder {
+	f.onset["gt"] = t
+	return f
+}
+
+func (f *InfoFinder) OnsetLte(t time.Time) db.InfoFinder {
+	f.onset["lte"] = t
+	return f
+}
+
+func (f *InfoFinder) OnsetLt(t time.Time) db.InfoFinder {
+	f.onset["lt"] = t
 	return f
 }
 
@@ -179,6 +245,73 @@ func (f *InfoFinder) query(service *elastic.SearchService) *elastic.SearchServic
 		for k, v := range f.textFields {
 			q = q.Must(elastic.NewQueryStringQuery(v).Field(k))
 		}
+	}
+
+	// Filter on times
+	if len(f.effective) > 0 {
+		rq := elastic.NewRangeQuery("effective")
+
+		if val, ok := f.effective["gte"]; ok {
+			rq.Gte(val)
+		}
+
+		if val, ok := f.effective["gt"]; ok {
+			rq.Gt(val)
+		}
+
+		if val, ok := f.effective["lte"]; ok {
+			rq.Lte(val)
+		}
+
+		if val, ok := f.effective["lt"]; ok {
+			rq.Lt(val)
+		}
+
+		q = q.Must(rq)
+	}
+
+	if len(f.expires) > 0 {
+		rq := elastic.NewRangeQuery("expires")
+
+		if val, ok := f.expires["gte"]; ok {
+			rq.Gte(val)
+		}
+
+		if val, ok := f.expires["gt"]; ok {
+			rq.Gt(val)
+		}
+
+		if val, ok := f.expires["lte"]; ok {
+			rq.Lte(val)
+		}
+
+		if val, ok := f.expires["lt"]; ok {
+			rq.Lt(val)
+		}
+
+		q = q.Must(rq)
+	}
+
+	if len(f.onset) > 0 {
+		rq := elastic.NewRangeQuery("onset")
+
+		if val, ok := f.onset["gte"]; ok {
+			rq.Gte(val)
+		}
+
+		if val, ok := f.onset["gt"]; ok {
+			rq.Gt(val)
+		}
+
+		if val, ok := f.onset["lte"]; ok {
+			rq.Lte(val)
+		}
+
+		if val, ok := f.onset["lt"]; ok {
+			rq.Lt(val)
+		}
+
+		q = q.Must(rq)
 	}
 
 	// Filter on area

@@ -1,6 +1,7 @@
 package db
 
 import cap "github.com/alerting/go-cap"
+import "time"
 
 type InfoHit struct {
 	Id      string    `json:"id"`
@@ -26,6 +27,18 @@ type InfoFinder interface {
 	Headline(headline string) InfoFinder
 	Description(description string) InfoFinder
 	Instruction(instruction string) InfoFinder
+	EffectiveGte(t time.Time) InfoFinder
+	EffectiveGt(t time.Time) InfoFinder
+	EffectiveLte(t time.Time) InfoFinder
+	EffectiveLt(t time.Time) InfoFinder
+	ExpiresGte(t time.Time) InfoFinder
+	ExpiresGt(t time.Time) InfoFinder
+	ExpiresLte(t time.Time) InfoFinder
+	ExpiresLt(t time.Time) InfoFinder
+	OnsetGte(t time.Time) InfoFinder
+	OnsetGt(t time.Time) InfoFinder
+	OnsetLte(t time.Time) InfoFinder
+	OnsetLt(t time.Time) InfoFinder
 
 	Area(area string) InfoFinder
 	Point(lat, lon float64) InfoFinder
