@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 // A Mutex is a distributed mutual exclusion lock.
@@ -43,7 +43,7 @@ func (m *Mutex) Lock() error {
 		if i != 0 {
 			time.Sleep(m.delay)
 		}
-		
+
 		start := time.Now()
 
 		n := 0
@@ -68,7 +68,7 @@ func (m *Mutex) Lock() error {
 	return ErrFailed
 }
 
-// Unlock unlocks m and returns the status of unlock. It is a run-time error if m is not locked on entry to Unlock.
+// Unlock unlocks m and returns the status of unlock.
 func (m *Mutex) Unlock() bool {
 	m.nodem.Lock()
 	defer m.nodem.Unlock()
@@ -83,7 +83,7 @@ func (m *Mutex) Unlock() bool {
 	return n >= m.quorum
 }
 
-// Extend resets the mutex's expiry and returns the status of expiry extension. It is a run-time error if m is not locked on entry to Extend.
+// Extend resets the mutex's expiry and returns the status of expiry extension.
 func (m *Mutex) Extend() bool {
 	m.nodem.Lock()
 	defer m.nodem.Unlock()

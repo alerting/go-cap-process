@@ -11,8 +11,8 @@ import (
 	"github.com/RichardKnop/machinery/v1/config"
 	"github.com/RichardKnop/machinery/v1/log"
 	"github.com/RichardKnop/machinery/v1/tasks"
-	"github.com/garyburd/redigo/redis"
-	"gopkg.in/redsync.v1"
+	"github.com/RichardKnop/redsync"
+	"github.com/gomodule/redigo/redis"
 )
 
 var redisDelayedTasksKey = "delayed_tasks"
@@ -70,7 +70,26 @@ func (b *RedisBroker) StartConsuming(consumerTag string, concurrency int, taskPr
 
 	// Channel to which we will push tasks ready for processing by worker
 	deliveries := make(chan []byte)
+	pool := make(chan struct{}, concurrency)
 
+	// initialize worker pool with maxWorkers workers
+	go func() {
+		for i := 0; i < concurrency; i++ {
+			pool <- struct{}{}
+		}
+	}()
+
+	// Helper function to return true if parallel task processing slots still available,
+	// false when we are already executing maximum allowed concurrent tasks
+	var concurrencyAvailable = func() bool {
+		return concurrency == 0 || (len(pool)-len(deliveries) > 0)
+	}
+
+	// Timer is added otherwise when the pools were all active it will spin the for loop
+	var (
+		timerDuration = time.Duration(100000000 * time.Nanosecond) // 100 miliseconds
+		timer         = time.NewTimer(0)
+	)
 	// A receivig goroutine keeps popping messages from the queue by BLPOP
 	// If the message is valid and can be unmarshaled into a proper structure
 	// we send it to the deliveries channel
@@ -84,13 +103,26 @@ func (b *RedisBroker) StartConsuming(consumerTag string, concurrency int, taskPr
 			// A way to stop this goroutine from b.StopConsuming
 			case <-b.stopReceivingChan:
 				return
-			default:
-				task, err := b.nextTask(b.cnf.DefaultQueue)
-				if err != nil {
-					continue
-				}
+			case <-timer.C:
+				// If concurrency is limited, limit the tasks being pulled off the queue
+				// until a pool is available
+				if concurrencyAvailable() {
+					task, err := b.nextTask(b.cnf.DefaultQueue)
+					if err != nil {
+						// something went wrong, wait a bit before continuing the loop
+						timer.Reset(timerDuration)
+						continue
+					}
 
-				deliveries <- task
+					deliveries <- task
+				}
+				if concurrencyAvailable() {
+					// parallel task processing slots still available, continue loop immediately
+					timer.Reset(0)
+				} else {
+					// using all parallel task processing slots, wait a bit before continuing the loop
+					timer.Reset(timerDuration)
+				}
 			}
 		}
 	}()
@@ -125,7 +157,7 @@ func (b *RedisBroker) StartConsuming(consumerTag string, concurrency int, taskPr
 		}
 	}()
 
-	if err := b.consume(deliveries, concurrency, taskProcessor); err != nil {
+	if err := b.consume(deliveries, pool, concurrency, taskProcessor); err != nil {
 		return b.retry, err
 	}
 
@@ -214,16 +246,7 @@ func (b *RedisBroker) GetPendingTasks(queue string) ([]*tasks.Signature, error) 
 
 // consume takes delivered messages from the channel and manages a worker pool
 // to process tasks concurrently
-func (b *RedisBroker) consume(deliveries <-chan []byte, concurrency int, taskProcessor TaskProcessor) error {
-	pool := make(chan struct{}, concurrency)
-
-	// initialize worker pool with maxWorkers workers
-	go func() {
-		for i := 0; i < concurrency; i++ {
-			pool <- struct{}{}
-		}
-	}()
-
+func (b *RedisBroker) consume(deliveries <-chan []byte, pool chan struct{}, concurrency int, taskProcessor TaskProcessor) error {
 	errorsChan := make(chan error, concurrency*2)
 
 	for {
@@ -304,7 +327,7 @@ func (b *RedisBroker) nextTask(queue string) (result []byte, err error) {
 }
 
 // nextDelayedTask pops a value from the ZSET key using WATCH/MULTI/EXEC commands.
-// https://github.com/garyburd/redigo/blob/master/redis/zpop_example_test.go
+// https://github.com/gomodule/redigo/blob/master/redis/zpop_example_test.go
 func (b *RedisBroker) nextDelayedTask(key string) (result []byte, err error) {
 	conn := b.open()
 	defer conn.Close()
