@@ -43,6 +43,7 @@ var (
             }
           },
           "incidents": { "type": "keyword", "normalizer": "keyword_normalizer" },
+          "superseded": { "type": "boolean" },
 
           "language": { "type": "keyword", "normalizer": "keyword_normalizer" },
           "categories": { "type": "keyword", "normalizer": "keyword_normalizer" },

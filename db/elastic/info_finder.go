@@ -14,6 +14,7 @@ type InfoFinder struct {
 	elastic *Elastic
 
 	parentId     string
+	superseded   *bool
 	parentFields map[string]string
 	termFields   map[string]string
 	textFields   map[string]string
@@ -32,6 +33,7 @@ type InfoFinder struct {
 func NewInfoFinder(elastic *Elastic) db.InfoFinder {
 	return &InfoFinder{
 		elastic:      elastic,
+		superseded:   nil,
 		parentFields: make(map[string]string),
 		termFields:   make(map[string]string),
 		textFields:   make(map[string]string),
@@ -47,6 +49,11 @@ func NewInfoFinder(elastic *Elastic) db.InfoFinder {
 /** FILTERS **/
 func (f *InfoFinder) AlertId(id string) db.InfoFinder {
 	f.parentId = id
+	return f
+}
+
+func (f *InfoFinder) Superseded(superseded bool) db.InfoFinder {
+	f.superseded = &superseded
 	return f
 }
 
@@ -227,19 +234,30 @@ func (f *InfoFinder) query(service *elastic.SearchService) *elastic.SearchServic
 	q := elastic.NewBoolQuery()
 
 	// Parent filter
-	if f.parentId != "" || len(f.parentFields) > 0 {
+	if f.parentId != "" || len(f.parentFields) > 0 || f.superseded != nil {
 		if f.parentId != "" {
 			q = q.Must(elastic.NewParentIdQuery("info", f.parentId))
 		}
 
-		if len(f.parentFields) > 0 {
+		if len(f.parentFields) > 0 || f.superseded != nil {
 			pq := elastic.NewBoolQuery()
 
-			for k, v := range f.parentFields {
-				pq = pq.Must(elastic.NewTermQuery(k, v))
+			if f.superseded != nil {
+				if *f.superseded {
+					pq = pq.Must(elastic.NewTermQuery("superseded", true))
+				} else {
+					pq = pq.MustNot(elastic.NewTermQuery("superseded", true))
+				}
+				for k, v := range f.parentFields {
+					pq = pq.Must(elastic.NewTermQuery(k, v))
+				}
 			}
 
 			q = q.Must(elastic.NewHasParentQuery("alert", pq))
+		}
+
+		if f.superseded != nil {
+
 		}
 	} else {
 		q = q.Must(elastic.NewHasParentQuery("alert", elastic.NewMatchAllQuery()))
