@@ -68,6 +68,11 @@ func addAlert(alertJSON string) error {
 		alert.Identifier,
 		alert.Id())
 
+	// Perform any processing/cleanup
+	if err := tasks.ProcessAlert(&alert); err != nil {
+		return err
+	}
+
 	// Queue tasks to ensure that references have been loaded
 	for _, reference := range alert.References {
 		_, err := tasks.EnsureReference(server, reference)
