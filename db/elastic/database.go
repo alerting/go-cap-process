@@ -3,7 +3,6 @@ package elastic
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/olivere/elastic"
@@ -119,7 +118,37 @@ func (es *Elastic) AlertExists(reference *cap.Reference) (bool, error) {
 }
 
 func (es *Elastic) GetAlert(reference *cap.Reference) (*cap.Alert, error) {
-	return nil, errors.New("Not implemented")
+	return es.GetAlertById(reference.Id())
+}
+
+func (es *Elastic) GetAlertById(id string) (*cap.Alert, error) {
+	item, err := es.client.Get().Index(es.index).Type("_doc").Id(id).Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the alert itself
+	var alert cap.Alert
+	err = json.Unmarshal(*item.Source, &alert)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the children (ie. infos)
+	finder := es.NewInfoFinder()
+	finder = finder.AlertId(alert.Id())
+	finder = finder.Sort("_id")
+
+	infos, err := finder.Find()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, hit := range infos.Hits {
+		alert.Infos = append(alert.Infos, *hit.Info)
+	}
+
+	return &alert, nil
 }
 
 func (es *Elastic) NewInfoFinder() db.InfoFinder {

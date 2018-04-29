@@ -13,6 +13,7 @@ import (
 type InfoFinder struct {
 	elastic *Elastic
 
+	parentId     string
 	parentFields map[string]string
 	termFields   map[string]string
 	textFields   map[string]string
@@ -44,6 +45,11 @@ func NewInfoFinder(elastic *Elastic) db.InfoFinder {
 }
 
 /** FILTERS **/
+func (f *InfoFinder) AlertId(id string) db.InfoFinder {
+	f.parentId = id
+	return f
+}
+
 func (f *InfoFinder) Status(status cap.Status) db.InfoFinder {
 	f.parentFields["status"] = status.String()
 	return f
@@ -221,14 +227,20 @@ func (f *InfoFinder) query(service *elastic.SearchService) *elastic.SearchServic
 	q := elastic.NewBoolQuery()
 
 	// Parent filter
-	if len(f.parentFields) > 0 {
-		pq := elastic.NewBoolQuery()
-
-		for k, v := range f.parentFields {
-			pq = pq.Must(elastic.NewTermQuery(k, v))
+	if f.parentId != "" || len(f.parentFields) > 0 {
+		if f.parentId != "" {
+			q = q.Must(elastic.NewParentIdQuery("info", f.parentId))
 		}
 
-		q = q.Must(elastic.NewHasParentQuery("alert", pq))
+		if len(f.parentFields) > 0 {
+			pq := elastic.NewBoolQuery()
+
+			for k, v := range f.parentFields {
+				pq = pq.Must(elastic.NewTermQuery(k, v))
+			}
+
+			q = q.Must(elastic.NewHasParentQuery("alert", pq))
+		}
 	} else {
 		q = q.Must(elastic.NewHasParentQuery("alert", elastic.NewMatchAllQuery()))
 	}

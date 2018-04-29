@@ -10,6 +10,7 @@ type Database interface {
 	AddAlert(alert ...*cap.Alert) error
 	AlertExists(reference *cap.Reference) (bool, error)
 	GetAlert(reference *cap.Reference) (*cap.Alert, error)
+	GetAlertById(id string) (*cap.Alert, error)
 
 	NewInfoFinder() InfoFinder
 }
